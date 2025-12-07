@@ -16,14 +16,18 @@ pipeline {
         }
         stage('Deploy') {
             steps {
-                withCredentials([sshUserPrivateKey(credentialsId: '0db01e01-db84-4fb9-9f5d-6714331439dc', keyFileVariable: 'KEYFILE', usernameVariable: 'USERNAME')]) {
-                    // Stop the service if it's running
+                withCredentials([sshUserPrivateKey(
+                    credentialsId: 'mykey', 
+                    keyFileVariable: 'KEYFILE', 
+                    usernameVariable: 'USERNAME'
+                )]) {
+                    // Stop the service if it's running (ignore errors if not running)
                     sh 'ssh -o StrictHostKeyChecking=no -i ${KEYFILE} ${USERNAME}@target "sudo systemctl stop main.service" || true'
                     
-                    // Copy the binary to target
+                    // Copy the binary to target machine
                     sh 'scp -o StrictHostKeyChecking=no -i ${KEYFILE} main ${USERNAME}@target:/home/laborant/'
                     
-                    // Make it executable
+                    // Make binary executable
                     sh 'ssh -o StrictHostKeyChecking=no -i ${KEYFILE} ${USERNAME}@target "chmod +x /home/laborant/main"'
                     
                     // Create systemd service file

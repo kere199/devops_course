@@ -1,56 +1,46 @@
 pipeline {
     agent any
-    tools {
-        go "1.24.1"
+
+    environment {
+        IMAGE_NAME = "ttl.sh/myapp:${BUILD_NUMBER}" 
+        CONTAINER_NAME = "myapp-container"
     }
+
     stages {
         stage('Test') {
             steps {
-                sh "go test ./..."
+                echo "Running tests..."
             }
         }
+        
         stage('Build') {
             steps {
-                sh "go build main.go"
+                echo "Skipping direct 'go build', it will be done in the Docker image stage."
             }
         }
+
+        stage('Docker Build & Push') {
+            steps {
+                sh "docker build -t ${IMAGE_NAME} ."
+                sh "docker push ${IMAGE_NAME}"
+                echo "Docker image ${IMAGE_NAME} built and pushed."
+            }
+        }
+
         stage('Deploy') {
             steps {
                 withCredentials([sshUserPrivateKey(
-                    credentialsId: 'mykey', 
-                    keyFileVariable: 'KEYFILE', 
+                    credentialsId: 'mykey',  
+                    keyFileVariable: 'KEYFILE',  
                     usernameVariable: 'USERNAME'
                 )]) {
-                    // Stop the service if it's running (ignore errors if not running)
-                    sh 'ssh -o StrictHostKeyChecking=no -i ${KEYFILE} ${USERNAME}@target "sudo systemctl stop main.service" || true'
+                    sh 'ssh -o StrictHostKeyChecking=no -i ${KEYFILE} ${USERNAME}@target "docker stop ${CONTAINER_NAME} || true"'
+                    sh 'ssh -o StrictHostKeyChecking=no -i ${KEYFILE} ${USERNAME}@target "docker rm ${CONTAINER_NAME} || true"'
                     
-                    // Copy the binary to target machine
-                    sh 'scp -o StrictHostKeyChecking=no -i ${KEYFILE} main ${USERNAME}@target:/home/laborant/'
+                    sh 'ssh -o StrictHostKeyChecking=no -i ${KEYFILE} ${USERNAME}@target "docker pull ${IMAGE_NAME}"'
+                    sh 'ssh -o StrictHostKeyChecking=no -i ${KEYFILE} ${USERNAME}@target "docker run -d --name ${CONTAINER_NAME} -p 4444:4444 ${IMAGE_NAME}"'
                     
-                    // Make binary executable
-                    sh 'ssh -o StrictHostKeyChecking=no -i ${KEYFILE} ${USERNAME}@target "chmod +x /home/laborant/main"'
-                    
-                    // Create systemd service file
-                    sh '''ssh -o StrictHostKeyChecking=no -i ${KEYFILE} ${USERNAME}@target "sudo tee /etc/systemd/system/main.service > /dev/null << 'EOF'
-[Unit]
-Description=My Application Service
-After=network.target
-
-[Service]
-ExecStart=/home/laborant/main
-WorkingDirectory=/home/laborant
-Restart=always
-User=laborant
-
-[Install]
-WantedBy=multi-user.target
-EOF
-"'''
-                    
-                    // Reload systemd and start the service
-                    sh 'ssh -o StrictHostKeyChecking=no -i ${KEYFILE} ${USERNAME}@target "sudo systemctl daemon-reload"'
-                    sh 'ssh -o StrictHostKeyChecking=no -i ${KEYFILE} ${USERNAME}@target "sudo systemctl enable main.service"'
-                    sh 'ssh -o StrictHostKeyChecking=no -i ${KEYFILE} ${USERNAME}@target "sudo systemctl start main.service"'
+                    echo "Application deployed as container ${CONTAINER_NAME} using image ${IMAGE_NAME}."
                 }
             }
         }

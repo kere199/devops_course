@@ -6,6 +6,7 @@ pipeline {
     environment {
         IMAGE = "ttl.sh/myapp-${BUILD_NUMBER}:2h"
         CONTAINER_NAME = "myapp"
+        DOCKER_HOSTNAME = "docker"
     }
     stages {
         stage('Test') {
@@ -24,7 +25,7 @@ pipeline {
             steps {
                 withCredentials([sshUserPrivateKey(credentialsId: 'mykey', keyFileVariable: 'KEYFILE', usernameVariable: 'USERNAME')]) {
                     sh """
-                    ssh -o StrictHostKeyChecking=no -i ${KEYFILE} ${USERNAME}@172.16.0.3 '
+                    ssh -o StrictHostKeyChecking=no -i ${KEYFILE} ${USERNAME}@${DOCKER_HOSTNAME} '
                         docker pull ${IMAGE}
                         docker stop ${CONTAINER_NAME} || true
                         docker rm ${CONTAINER_NAME} || true

@@ -51,7 +51,7 @@ pipeline {
     agent any
     
     environment {
-        IMAGE_NAME = "ttl.sh/myapp:${BUILD_NUMBER}" 
+        IMAGE_NAME = "ttl.sh/myapp-${BUILD_NUMBER}:1h" 
         CONTAINER_NAME = "myapp-container" 
     }
 
@@ -59,6 +59,8 @@ pipeline {
         stage('Test') {
             steps {
                 echo "Running tests..."
+                // You can optionally run your Go tests here
+                // sh "go test ./..."
             }
         }
         
@@ -70,12 +72,14 @@ pipeline {
 
         stage('Docker Build & Push') {
             steps {
+                echo "Building Docker image ${IMAGE_NAME}..."
                 sh "docker build -t ${IMAGE_NAME} ."
+                
+                echo "Pushing Docker image to ttl.sh..."
                 sh "docker push ${IMAGE_NAME}"
-                echo "Docker image ${IMAGE_NAME} built and pushed to ttl.sh."
+                
+                echo "Docker image ${IMAGE_NAME} built and pushed to ttl.sh successfully."
             }
         }
-        
-
     }
 }

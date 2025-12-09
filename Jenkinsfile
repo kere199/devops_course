@@ -4,9 +4,8 @@ pipeline {
         go "1.24.1"
     }
     environment {
-        IMAGE = "ttl.sh/myapp-${BUILD_NUMBER}:2h"
+        IMAGE = "ttl.sh/myapp-${BUILD_NUMBER}:2h"  // Unique image per build
         CONTAINER_NAME = "myapp"
-        DOCKER_HOSTNAME = "docker"
     }
     stages {
         stage('Test') {
@@ -14,23 +13,27 @@ pipeline {
                 sh "go test ./..."
             }
         }
-        stage('Docker Build & Push') {
+        stage('Build') {
             steps {
-                echo "Building Docker image ${IMAGE}"
+                sh "go build main.go"
+            }
+        }
+        stage('Build Docker Image') {
+            steps {
                 sh "docker build -t ${IMAGE} ."
                 sh "docker push ${IMAGE}"
             }
         }
-        stage('Deploy to Docker VM') {
+        stage('Docker Run Image') {
             steps {
-                withCredentials([sshUserPrivateKey(credentialsId: 'mykey', keyFileVariable: 'KEYFILE', usernameVariable: 'USERNAME')]) {
+                withCredentials([sshUserPrivateKey(credentialsId: 'mykey', keyFileVariable: 'FILENAME', usernameVariable: 'USERNAME')]) {
                     sh """
-                    ssh -o StrictHostKeyChecking=no -i ${KEYFILE} ${USERNAME}@${DOCKER_HOSTNAME} '
-                        docker pull ${IMAGE}
-                        docker stop ${CONTAINER_NAME} || true
-                        docker rm ${CONTAINER_NAME} || true
-                        docker run -d --name ${CONTAINER_NAME} -p 4444:4444 ${IMAGE}
-                    '
+                        ssh -o StrictHostKeyChecking=no -i ${FILENAME} ${USERNAME}@docker '
+                            docker pull ${IMAGE}
+                            docker stop ${CONTAINER_NAME} || true
+                            docker rm ${CONTAINER_NAME} || true
+                            docker run --name ${CONTAINER_NAME} --detach --publish 4444:4444 ${IMAGE}
+                        '
                     """
                 }
             }

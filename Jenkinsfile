@@ -1,40 +1,52 @@
 pipeline {
     agent any
+
     tools {
         go "1.24.1"
     }
+
     environment {
-        IMAGE = "ttl.sh/myapp-${BUILD_NUMBER}:2h"  // Unique image per build
-        CONTAINER_NAME = "myapp"
+        IMAGE = "ttl.sh/myapp-${BUILD_NUMBER}:1h"
     }
+
     stages {
+
         stage('Test') {
             steps {
-                sh "go test ./..."
+                sh 'go test ./...'
             }
         }
+
         stage('Build') {
             steps {
-                sh "go build main.go"
+                sh 'go build main.go'
             }
         }
+
         stage('Build Docker Image') {
             steps {
-                sh "docker build -t ${IMAGE} ."
-                sh "docker push ${IMAGE}"
+                sh 'docker build -t ${IMAGE} .'
             }
         }
-        stage('Docker Run Image') {
+
+        stage('Push Docker Image') {
             steps {
-                withCredentials([sshUserPrivateKey(credentialsId: 'mykey', keyFileVariable: 'FILENAME', usernameVariable: 'USERNAME')]) {
-                    sh """
-                        ssh -o StrictHostKeyChecking=no -i ${FILENAME} ${USERNAME}@docker '
-                            docker pull ${IMAGE}
-                            docker stop ${CONTAINER_NAME} || true
-                            docker rm ${CONTAINER_NAME} || true
-                            docker run --name ${CONTAINER_NAME} --detach --publish 4444:4444 ${IMAGE}
-                        '
-                    """
+                sh 'docker push ${IMAGE}'
+            }
+        }
+
+        stage('Deploy Pod to Kubernetes') {
+            steps {
+                withKubeConfig(
+                    credentialsId: 'k8s-token',
+                    serverUrl: 'https://kubernetes:6443'
+                ) {
+                    sh '''
+                    kubectl delete pod myapp --ignore-not-found
+                    kubectl run myapp \
+                      --image=${IMAGE} \
+                      --port=4444
+                    '''
                 }
             }
         }

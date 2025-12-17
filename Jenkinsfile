@@ -41,7 +41,8 @@ pipeline {
                     sh '''
                     ssh -o StrictHostKeyChecking=no -i $KEY $USER@43.209.9.28 "
                         chmod +x ~/app/myapp &&
-                        nohup ~/app/myapp > ~/app/app.log 2>&1 &
+                        nohup ~/app/myapp > ~/app/app.log 2>&1 </dev/null >/dev/null 2>&1 &
+                        exit
                     "
                     '''
                 }

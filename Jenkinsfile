@@ -6,10 +6,9 @@ pipeline {
     }
 
     stages {
-
         stage('Test') {
             steps {
-                sh 'go test ./... || true'
+                sh 'go test ./...'
             }
         }
 
@@ -24,15 +23,26 @@ pipeline {
                 withCredentials([
                     sshUserPrivateKey(
                         credentialsId: 'mykey',
-                        keyFileVariable: 'SSH_KEY',
-                        usernameVariable: 'SSH_USER'
+                        keyFileVariable: 'KEY',
+                        usernameVariable: 'USER'
                     )
                 ]) {
+                    sh '''
+                    ssh -o StrictHostKeyChecking=no -i $KEY $USER@43.209.9.28 "
+                        mkdir -p ~/app &&
+                        pkill myapp || true
+                    "
+                    '''
 
                     sh '''
-                    ssh -o StrictHostKeyChecking=no -i $SSH_KEY $SSH_USER@43.209.9.28 "mkdir -p ~/app"
-                    scp -o StrictHostKeyChecking=no -i $SSH_KEY myapp $SSH_USER@43.209.9.28:~/app/myapp
-                    ssh -o StrictHostKeyChecking=no -i $SSH_KEY $SSH_USER@43.209.9.28 "chmod +x ~/app/myapp"
+                    scp -o StrictHostKeyChecking=no -i $KEY myapp $USER@43.209.9.28:~/app/
+                    '''
+
+                    sh '''
+                    ssh -o StrictHostKeyChecking=no -i $KEY $USER@43.209.9.28 "
+                        chmod +x ~/app/myapp &&
+                        nohup ~/app/myapp > ~/app/app.log 2>&1 &
+                    "
                     '''
                 }
             }

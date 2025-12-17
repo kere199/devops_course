@@ -29,12 +29,13 @@ pipeline {
                 ]) {
                     sh '''
                     ssh -o StrictHostKeyChecking=no -i $KEY $USER@43.209.9.28 "
-                        mkdir -p ~/app
+                        mkdir -p /home/ubuntu/app
                     "
                     '''
 
                     sh '''
-                    scp -o StrictHostKeyChecking=no -i $KEY myapp $USER@43.209.9.28:~/app/
+                    scp -o StrictHostKeyChecking=no -i $KEY myapp \
+                        $USER@43.209.9.28:/home/ubuntu/app/
                     '''
                 }
             }

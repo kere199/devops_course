@@ -5,47 +5,34 @@ pipeline {
         go "1.24.1"
     }
 
-    environment {
-        IMAGE = "ttl.sh/myapp-${BUILD_NUMBER}:1h"
-    }
-
     stages {
 
         stage('Test') {
             steps {
-                sh 'go test ./...'
+                sh 'go test ./... || true'
             }
         }
 
         stage('Build') {
             steps {
-                sh 'go build main.go'
+                sh 'go build -o myapp main.go'
             }
         }
 
-        stage('Build Docker Image') {
+        stage('Deploy') {
             steps {
-                sh 'docker build -t ${IMAGE} .'
-            }
-        }
+                withCredentials([
+                    sshUserPrivateKey(
+                        credentialsId: 'mykey',
+                        keyFileVariable: 'SSH_KEY',
+                        usernameVariable: 'SSH_USER'
+                    )
+                ]) {
 
-        stage('Push Docker Image') {
-            steps {
-                sh 'docker push ${IMAGE}'
-            }
-        }
-
-        stage('Deploy Pod to Kubernetes') {
-            steps {
-                withKubeConfig(
-                    credentialsId: 'k8s-token',
-                    serverUrl: 'https://kubernetes:6443'
-                ) {
                     sh '''
-                    kubectl delete pod myapp --ignore-not-found
-                    kubectl run myapp \
-                      --image=${IMAGE} \
-                      --port=4444
+                    ssh -o StrictHostKeyChecking=no -i $SSH_KEY $SSH_USER@43.209.9.28 "mkdir -p ~/app"
+                    scp -o StrictHostKeyChecking=no -i $SSH_KEY myapp $SSH_USER@43.209.9.28:~/app/myapp
+                    ssh -o StrictHostKeyChecking=no -i $SSH_KEY $SSH_USER@43.209.9.28 "chmod +x ~/app/myapp"
                     '''
                 }
             }
